@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   sync:
-    name: Fast-forward main from upstream
+    name: Rebase main onto upstream
     runs-on: ubuntu-latest
     steps:
       - name: Checkout fork
@@ -26,16 +26,24 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Sync with upstream (fast-forward only)
+      - name: Sync with upstream (rebase own commits on top)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/chrisdoc/hevy-mcp.git
           git fetch upstream main
           if [ "$(git rev-parse HEAD)" = "$(git rev-parse upstream/main)" ]; then
             echo "Fork is already up to date."
             exit 0
           fi
-          git merge --ff-only upstream/main
-          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/pohjolanvaris/hevy-mcp.git" main
-          echo "Fork updated to $(git rev-parse --short upstream/main)."
+          BEFORE="$(git rev-parse HEAD)"
+          git rebase upstream/main
+          if [ "$(git rev-parse HEAD)" = "$BEFORE" ]; then
+            echo "Nothing to push."
+            exit 0
+          fi
+          git push --force-with-lease "https://x-access-token:${GITHUB_TOKEN}@github.com/pohjolanvaris/hevy-mcp.git" main
+          echo "Fork updated to $(git rev-parse --short upstream/main) with local commits rebased on top."
