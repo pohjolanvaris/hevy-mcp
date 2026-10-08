@@ -1,0 +1,37 @@
+name: Sync fork with upstream
+
+on:
+  schedule:
+    # Daily at 06:00 UTC = 09:00 Helsinki time
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Fast-forward main from upstream
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync with upstream (fast-forward only)
+        run: |
+          git remote add upstream https://github.com/chrisdoc/hevy-mcp.git
+          git fetch upstream main
+          if [ "$(git rev-parse HEAD)" = "$(git rev-parse upstream/main)" ]; then
+            echo "Fork is already up to date."
+            exit 0
+          fi
+          git merge --ff-only upstream/main
+          git push origin main
+          echo "Fork updated to $(git rev-parse --short upstream/main)."
